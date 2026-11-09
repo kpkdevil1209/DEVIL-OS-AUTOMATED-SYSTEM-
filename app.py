@@ -2,7 +2,6 @@ import os
 import time
 from datetime import datetime
 import streamlit as st
-from huggingface_hub import InferenceClient
 import base64
 import requests
 
@@ -29,28 +28,37 @@ MONITOR_CREDENTIALS = {
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 MODEL_NAME = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 
-# Initialize Inference Client safely
-client = None
-if HF_TOKEN:
-    try:
-        client = InferenceClient(api_key=HF_TOKEN)
-    except Exception:
-        client = None
-
 def run_agent_role(agent_name, system_prompt, input_data):
-    if not client:
-        return "[ERROR]: Hugging Face API Token (HF_TOKEN) missing or client not initialized in Streamlit Secrets!"
+    if not HF_TOKEN:
+        return "[ERROR]: Hugging Face API Token (HF_TOKEN) missing in Streamlit Secrets!"
     try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
+        headers = {
+            "Authorization": f"Bearer {HF_TOKEN}",
+            "Content-Type": "application/json"
+        }
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": input_data}
             ],
-            max_tokens=1000,
-            temperature=0.6
+            "max_tokens": 1000,
+            "temperature": 0.6
+        }
+        
+        response = requests.post(
+            "https://router.huggingface.co/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60
         )
-        return response.choices[0].message.content
+        
+        if response.status_code == 200:
+            res_json = response.json()
+            return res_json["choices"][0]["message"]["content"]
+        else:
+            return f"[API ERROR {response.status_code}]: {response.text}"
+            
     except Exception as e:
         return f"[AGENT ERROR]: {str(e)}"
 
@@ -289,4 +297,4 @@ else:
             if st.button("Clear Logs"):
                 st.session_state.logs = []
                 st.rerun()
-  
+    
