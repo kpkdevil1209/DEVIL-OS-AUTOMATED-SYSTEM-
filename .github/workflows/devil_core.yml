@@ -1,0 +1,75 @@
+name: DEVIL OS - Autonomous Cyber Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      goal:
+        description: 'Target Goal / Feature to Generate'
+        required: true
+        default: 'High-performance modular AI task automation script with self-healing failover.'
+      engine_mode:
+        description: 'Engine Mode (local-qwen requires ZERO tokens!)'
+        required: true
+        type: choice
+        options:
+          - 'local-qwen'
+          - 'auto-fast'
+        default: 'local-qwen'
+
+permissions:
+  contents: write
+
+jobs:
+  execute-7-agents:
+    name: '💀 Run 7-Agent Core'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Install Local Qwen Dependencies (Zero Token Mode)
+        if: ${{ github.event.inputs.engine_mode == 'local-qwen' }}
+        run: |
+          pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --no-cache-dir transformers accelerate
+          echo "✅ Local Qwen CPU dependencies installed successfully!"
+
+      - name: ⚡ Execute Devil OS 7-Agent Core
+        run: |
+          python devil_cli.py \
+            --goal "${{ github.event.inputs.goal }}" \
+            --mode "${{ github.event.inputs.engine_mode == 'local-qwen' && 'local' || 'offline' }}"
+
+      - name: 🛡️ Verify Generated Python Syntax
+        run: |
+          python -m py_compile generated_feature.py
+          echo "✅ Syntax 100% verified with zero indentation or syntax errors!"
+
+      - name: 🚀 Auto-Commit & Push Generated Feature & Audit Report
+        run: |
+          git config user.name "devil-os-bot"
+          git config user.email "bot@devilos.internal"
+          git add generated_feature.py DEVIL_PIPELINE_REPORT.md
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "🤖 [DEVIL OS] Auto-generated feature: ${{ github.event.inputs.goal }} [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "✅ Successfully pushed generated code and report to repository!"
+          fi
+
+      - name: 📦 Upload Pipeline Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: devil-os-generated-build
+          path: |
+            generated_feature.py
+            DEVIL_PIPELINE_REPORT.md
